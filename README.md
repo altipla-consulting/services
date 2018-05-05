@@ -1,2 +1,4 @@
+
 # service-init
-Helper para la inicialización de servicios.
+
+Helper para la inicialización y tratamiento de servicios.
