@@ -63,7 +63,7 @@ func (service *Service) ConfigureProfiler() {
 }
 
 func (service *Service) Run() {
-	if service.ProfilerEnabled {
+	if !IsLocal() && service.ProfilerEnabled {
 		cnf := profiler.Config{
 			Service:        service.Name,
 			ServiceVersion: Version(),
