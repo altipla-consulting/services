@@ -90,6 +90,7 @@ func (service *Service) Run() {
 		runner := cron.NewRunner(cron.WithSentry(service.SentryDSN))
 		if IsLocal() {
 			service.KingRouter.GET(fmt.Sprintf("/crons/%s/:job", service.Name), runner.Handler())
+			service.HTTPRouter.GET(fmt.Sprintf("/crons/%s/:job", service.Name), runner.Handler())
 		}
 	}
 
@@ -99,7 +100,7 @@ func (service *Service) Run() {
 		}()
 	}
 
-	if service.RoutingEnabled {
+	if service.RoutingEnabled || service.CronEnabled {
 		go func() {
 			log.Fatal(http.ListenAndServe(":8080", service.HTTPRouter))
 		}()
