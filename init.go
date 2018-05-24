@@ -42,8 +42,10 @@ func Init(name string) *Service {
 }
 
 func (service *Service) ConfigureSentry(dsn string) {
-	service.SentryEnabled = true
-	service.SentryDSN = dsn
+	if dsn != "" {
+		service.SentryEnabled = true
+		service.SentryDSN = dsn
+	}
 }
 
 func (service *Service) ConfigureKing() {
