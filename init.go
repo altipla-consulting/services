@@ -29,6 +29,8 @@ type Service struct {
 	RoutingEnabled bool
 
 	ProfilerEnabled bool
+
+	CronRunner *cron.Runner
 }
 
 func Init(name string) *Service {
@@ -38,6 +40,7 @@ func Init(name string) *Service {
 		Name:       name,
 		KingRouter: httprouter.New(),
 		HTTPRouter: httprouter.New(),
+		CronRunner: cron.NewRunner(),
 	}
 }
 
@@ -89,10 +92,9 @@ func (service *Service) Run() {
 	}
 
 	if service.CronEnabled {
-		runner := cron.NewRunner(cron.WithSentry(service.SentryDSN))
 		if IsLocal() {
-			service.KingRouter.GET(fmt.Sprintf("/crons/%s/:job", service.Name), runner.Handler())
-			service.HTTPRouter.GET(fmt.Sprintf("/crons/%s/:job", service.Name), runner.Handler())
+			service.KingRouter.GET(fmt.Sprintf("/crons/%s/:job", service.Name), service.CronRunner.Handler())
+			service.HTTPRouter.GET(fmt.Sprintf("/crons/%s/:job", service.Name), service.CronRunner.Handler())
 		}
 	}
 
