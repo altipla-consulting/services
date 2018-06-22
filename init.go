@@ -98,7 +98,7 @@ func (service *Service) CronRunner() *cron.Runner {
 func (service *Service) Run() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	if !IsLocal() && service.profilerEnabled {
+	if service.profilerEnabled && !IsLocal() {
 		cnf := profiler.Config{
 			Service:        service.name,
 			ServiceVersion: Version(),
@@ -121,11 +121,9 @@ func (service *Service) Run() {
 		king.NewServer(options...)
 	}
 
-	if service.enabledCron {
-		if IsLocal() {
-			service.kingRouter.GET(fmt.Sprintf("/crons/%s/:job", service.name), service.cronRunner.Handler())
-			service.httpRouter.GET(fmt.Sprintf("/crons/%s/:job", service.name), service.cronRunner.Handler())
-		}
+	if service.enabledCron && IsLocal() {
+		service.kingRouter.GET(fmt.Sprintf("/crons/%s/:job", service.name), service.cronRunner.Handler())
+		service.httpRouter.GET(fmt.Sprintf("/crons/%s/:job", service.name), service.cronRunner.Handler())
 	}
 
 	if service.enabledKing || service.enabledCron {
