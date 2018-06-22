@@ -15,62 +15,92 @@ import (
 )
 
 type Service struct {
-	Name       string
-	HTTPRouter *httprouter.Router
-	KingRouter *httprouter.Router
+	name string
 
-	SentryEnabled bool
-	SentryDSN     string
+	enabledSentry bool
+	sentryDSN     string
 
-	KingEnabled bool
+	enabledKing bool
+	kingRouter  *httprouter.Router
 
-	CronEnabled bool
+	enabledCron bool
+	cronRunner  *cron.Runner
 
-	RoutingEnabled bool
+	enabledRouting bool
+	httpRouter     *httprouter.Router
 
-	ProfilerEnabled bool
-
-	CronRunner *cron.Runner
+	profilerEnabled bool
 }
 
 func Init(name string) *Service {
-	rand.Seed(time.Now().UTC().UnixNano())
-
-	return &Service{
-		Name:       name,
-		KingRouter: httprouter.New(),
-		HTTPRouter: httprouter.New(),
-		CronRunner: cron.NewRunner(),
-	}
+	return &Service{name: name}
 }
 
 func (service *Service) ConfigureSentry(dsn string) {
 	if dsn != "" {
-		service.SentryEnabled = true
-		service.SentryDSN = dsn
+		service.enabledSentry = true
+		service.sentryDSN = dsn
 	}
 }
 
 func (service *Service) ConfigureKing() {
-	service.KingEnabled = true
+	service.enabledKing = true
 }
 
 func (service *Service) ConfigureCron() {
-	service.CronEnabled = true
+	service.enabledCron = true
 }
 
 func (service *Service) ConfigureRouting() {
-	service.RoutingEnabled = true
+	service.enabledRouting = true
 }
 
 func (service *Service) ConfigureProfiler() {
-	service.ProfilerEnabled = true
+	service.profilerEnabled = true
+}
+
+func (service *Service) HTTPRouter() *httprouter.Router {
+	if !service.enabledRouting {
+		panic("routing must be enabled to get an http router")
+	}
+
+	if service.httpRouter == nil {
+		service.httpRouter = httprouter.New()
+	}
+
+	return service.httpRouter
+}
+
+func (service *Service) KingRouter() *httprouter.Router {
+	if !service.enabledKing {
+		panic("king must be enabled to get a king router")
+	}
+
+	if service.kingRouter == nil {
+		service.kingRouter = httprouter.New()
+	}
+
+	return service.kingRouter
+}
+
+func (service *Service) CronRunner() *cron.Runner {
+	if !service.enabledCron {
+		panic("crons must be enabled to get a cron runner")
+	}
+
+	if service.cronRunner == nil {
+		service.cronRunner = cron.NewRunner(cron.WithSentry(service.sentryDSN))
+	}
+
+	return service.cronRunner
 }
 
 func (service *Service) Run() {
-	if !IsLocal() && service.ProfilerEnabled {
+	rand.Seed(time.Now().UTC().UnixNano())
+
+	if !IsLocal() && service.profilerEnabled {
 		cnf := profiler.Config{
-			Service:        service.Name,
+			Service:        service.name,
 			ServiceVersion: Version(),
 			DebugLogging:   IsLocal(),
 		}
@@ -79,40 +109,40 @@ func (service *Service) Run() {
 		}
 	}
 
-	if service.KingEnabled {
+	if service.enabledKing {
 		options := []king.ServerOption{
-			king.WithHttprouter(service.KingRouter),
+			king.WithHttprouter(service.kingRouter),
 			king.WithLogrus(),
 			king.Debug(IsLocal()),
 		}
 		if !IsLocal() {
-			options = append(options, king.WithSentry(service.SentryDSN))
+			options = append(options, king.WithSentry(service.sentryDSN))
 		}
 		king.NewServer(options...)
 	}
 
-	if service.CronEnabled {
+	if service.enabledCron {
 		if IsLocal() {
-			service.KingRouter.GET(fmt.Sprintf("/crons/%s/:job", service.Name), service.CronRunner.Handler())
-			service.HTTPRouter.GET(fmt.Sprintf("/crons/%s/:job", service.Name), service.CronRunner.Handler())
+			service.kingRouter.GET(fmt.Sprintf("/crons/%s/:job", service.name), service.cronRunner.Handler())
+			service.httpRouter.GET(fmt.Sprintf("/crons/%s/:job", service.name), service.cronRunner.Handler())
 		}
 	}
 
-	if service.KingEnabled || service.CronEnabled {
+	if service.enabledKing || service.enabledCron {
 		go func() {
-			log.Fatal(http.ListenAndServe(":9000", service.KingRouter))
+			log.Fatal(http.ListenAndServe(":9000", service.kingRouter))
 		}()
 	}
 
-	if service.RoutingEnabled || service.CronEnabled {
+	if service.enabledRouting || service.enabledCron {
 		go func() {
-			log.Fatal(http.ListenAndServe(":8080", service.HTTPRouter))
+			log.Fatal(http.ListenAndServe(":8080", service.httpRouter))
 		}()
 	}
 
 	trace.AuthRequest = func(req *http.Request) (any, sensitive bool) { return true, true }
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "%s is ok\n", service.Name) })
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "%s is ok\n", service.name) })
 
-	log.WithField("name", service.Name).Println("Instance initialized successfully!")
+	log.WithField("name", service.name).Println("Instance initialized successfully!")
 	log.Fatal(http.ListenAndServe(":8000", nil))
 }
