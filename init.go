@@ -33,7 +33,11 @@ type Service struct {
 }
 
 func Init(name string) *Service {
-	return &Service{name: name}
+	return &Service{
+		name: name,
+		kingRouter: httprouter.New(),
+		httpRouter: httprouter.New(),
+	}
 }
 
 func (service *Service) ConfigureSentry(dsn string) {
@@ -64,20 +68,12 @@ func (service *Service) HTTPRouter() *httprouter.Router {
 		panic("routing must be enabled to get an http router")
 	}
 
-	if service.httpRouter == nil {
-		service.httpRouter = httprouter.New()
-	}
-
 	return service.httpRouter
 }
 
 func (service *Service) KingRouter() *httprouter.Router {
 	if !service.enabledKing {
 		panic("king must be enabled to get a king router")
-	}
-
-	if service.kingRouter == nil {
-		service.kingRouter = httprouter.New()
 	}
 
 	return service.kingRouter
