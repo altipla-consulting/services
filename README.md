@@ -10,7 +10,7 @@ Helper to initialize services & applications.
 ### Install
 
 ```shell
-go get github.com/altipla-consulting/database
+go get github.com/altipla-consulting/services
 ```
 
 This library has the following dependencies:
