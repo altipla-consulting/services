@@ -15,6 +15,6 @@ deps:
 	go get -u github.com/sirupsen/logrus
 	go get -u golang.org/x/net/trace
 
-lint:
+test:
 	revive -formatter friendly
 	go install .
