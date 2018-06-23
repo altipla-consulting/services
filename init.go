@@ -28,6 +28,7 @@ type Service struct {
 
 	enabledRouting bool
 	httpRouter     *httprouter.Router
+	httpRouterCalled bool
 
 	profilerEnabled bool
 }
@@ -68,6 +69,8 @@ func (service *Service) HTTPRouter() *httprouter.Router {
 		panic("routing must be enabled to get an http router")
 	}
 
+	service.httpRouterCalled = true
+
 	return service.httpRouter
 }
 
@@ -93,6 +96,10 @@ func (service *Service) CronRunner() *cron.Runner {
 
 func (service *Service) Run() {
 	rand.Seed(time.Now().UTC().UnixNano())
+
+	if service.enabledRouting && !service.httpRouterCalled {
+		panic("do not configure routing without routes")
+	}
 
 	if service.profilerEnabled && !IsLocal() {
 		cnf := profiler.Config{
