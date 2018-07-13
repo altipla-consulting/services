@@ -10,5 +10,7 @@ func init() {
 			ForceColors: true,
 		})
 		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetFormatter(&log.JSONFormatter{})
 	}
 }
