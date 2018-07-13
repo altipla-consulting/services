@@ -17,25 +17,28 @@ import (
 type Service struct {
 	name string
 
-	enabledSentry bool
-	sentryDSN     string
+	enableSentry bool
+	sentryDSN    string
 
-	enabledKing bool
-	kingRouter  *httprouter.Router
+	enableKing bool
+	kingRouter *httprouter.Router
 
-	enabledCron bool
-	cronRunner  *cron.Runner
+	enableCron bool
+	cronRunner *cron.Runner
 
-	enabledRouting bool
-	httpRouter     *httprouter.Router
+	enableRouting    bool
+	httpRouter       *httprouter.Router
 	httpRouterCalled bool
 
-	profilerEnabled bool
+	enableProfiler bool
+
+	enableQueues  bool
+	queuesHandler httprouter.Handle
 }
 
 func Init(name string) *Service {
 	return &Service{
-		name: name,
+		name:       name,
 		kingRouter: httprouter.New(),
 		httpRouter: httprouter.New(),
 	}
@@ -43,29 +46,34 @@ func Init(name string) *Service {
 
 func (service *Service) ConfigureSentry(dsn string) {
 	if dsn != "" {
-		service.enabledSentry = true
+		service.enableSentry = true
 		service.sentryDSN = dsn
 	}
 }
 
 func (service *Service) ConfigureKing() {
-	service.enabledKing = true
+	service.enableKing = true
 }
 
 func (service *Service) ConfigureCron() {
-	service.enabledCron = true
+	service.enableCron = true
 }
 
 func (service *Service) ConfigureRouting() {
-	service.enabledRouting = true
+	service.enableRouting = true
 }
 
 func (service *Service) ConfigureProfiler() {
-	service.profilerEnabled = true
+	service.enableProfiler = true
+}
+
+func (service *Service) ConfigureQueues(handler httprouter.Handle) {
+	service.enableQueues = true
+	service.queuesHandler = handler
 }
 
 func (service *Service) HTTPRouter() *httprouter.Router {
-	if !service.enabledRouting {
+	if !service.enableRouting {
 		panic("routing must be enabled to get an http router")
 	}
 
@@ -75,7 +83,7 @@ func (service *Service) HTTPRouter() *httprouter.Router {
 }
 
 func (service *Service) KingRouter() *httprouter.Router {
-	if !service.enabledKing {
+	if !service.enableKing {
 		panic("king must be enabled to get a king router")
 	}
 
@@ -83,7 +91,7 @@ func (service *Service) KingRouter() *httprouter.Router {
 }
 
 func (service *Service) CronRunner() *cron.Runner {
-	if !service.enabledCron {
+	if !service.enableCron {
 		panic("crons must be enabled to get a cron runner")
 	}
 
@@ -97,11 +105,11 @@ func (service *Service) CronRunner() *cron.Runner {
 func (service *Service) Run() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	if service.enabledRouting && !service.httpRouterCalled {
+	if service.enableRouting && !service.httpRouterCalled {
 		panic("do not configure routing without routes")
 	}
 
-	if service.profilerEnabled && !IsLocal() {
+	if service.enableProfiler && !IsLocal() {
 		cnf := profiler.Config{
 			Service:        service.name,
 			ServiceVersion: Version(),
@@ -112,7 +120,7 @@ func (service *Service) Run() {
 		}
 	}
 
-	if service.enabledKing {
+	if service.enableKing {
 		options := []king.ServerOption{
 			king.WithHttprouter(service.kingRouter),
 			king.WithLogrus(),
@@ -124,20 +132,28 @@ func (service *Service) Run() {
 		king.NewServer(options...)
 	}
 
-	if service.enabledCron && IsLocal() {
+	if service.enableCron && IsLocal() {
 		service.kingRouter.GET(fmt.Sprintf("/crons/%s/:job", service.name), service.cronRunner.Handler())
 		service.httpRouter.GET(fmt.Sprintf("/crons/%s/:job", service.name), service.cronRunner.Handler())
 	}
 
-	if service.enabledKing || service.enabledCron {
+	if service.enableKing || service.enableCron {
 		go func() {
 			log.Fatal(http.ListenAndServe(":9000", service.kingRouter))
 		}()
 	}
 
-	if service.enabledRouting || service.enabledCron {
+	if service.enableRouting || service.enableCron {
 		go func() {
 			log.Fatal(http.ListenAndServe(":8080", service.httpRouter))
+		}()
+	}
+
+	if service.enableQueues {
+		go func() {
+			r := httprouter.New()
+			r.POST("/tasks", service.queuesHandler)
+			log.Fatal(http.ListenAndServe(":10000", r))
 		}()
 	}
 
