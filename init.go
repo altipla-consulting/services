@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"math/rand"
+	"net"
 	"net/http"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/trace"
+	"google.golang.org/grpc"
 )
 
 type Service struct {
@@ -32,8 +34,9 @@ type Service struct {
 
 	enableProfiler bool
 
-	enableQueues  bool
-	queuesHandler httprouter.Handle
+	enableGRPC       bool
+	grpcServer       *grpc.Server
+	grpcServerCalled bool
 }
 
 func Init(name string) *Service {
@@ -67,9 +70,19 @@ func (service *Service) ConfigureProfiler() {
 	service.enableProfiler = true
 }
 
-func (service *Service) ConfigureQueues(handler httprouter.Handle) {
-	service.enableQueues = true
-	service.queuesHandler = handler
+func (service *Service) ConfigureGRPC() {
+	service.enableGRPC = true
+	service.grpcServer = grpc.NewServer()
+}
+
+func (service *Service) GRPCServer() *grpc.Server {
+	if !service.enableGRPC {
+		panic("grpc must be enabled to get a grpc server")
+	}
+
+	service.grpcServerCalled = true
+
+	return service.grpcServer
 }
 
 func (service *Service) HTTPRouter() *httprouter.Router {
@@ -107,6 +120,9 @@ func (service *Service) Run() {
 
 	if service.enableRouting && !service.httpRouterCalled {
 		panic("do not configure routing without routes")
+	}
+	if service.enableGRPC && !service.grpcServerCalled {
+		panic("do not configure grpc without services")
 	}
 
 	if service.enableProfiler && !IsLocal() {
@@ -149,11 +165,14 @@ func (service *Service) Run() {
 		}()
 	}
 
-	if service.enableQueues {
+	if service.enableGRPC {
 		go func() {
-			r := httprouter.New()
-			r.POST("/tasks", service.queuesHandler)
-			log.Fatal(http.ListenAndServe(":10000", r))
+			lis, err := net.Listen("tcp", ":9000")
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Info("GRPC server initialized successfully!")
+			log.Fatal(service.grpcServer.Serve(lis))
 		}()
 	}
 

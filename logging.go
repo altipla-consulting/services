@@ -11,6 +11,6 @@ func init() {
 		})
 		log.SetLevel(log.DebugLevel)
 	} else {
-		log.SetFormatter(&log.JSONFormatter{})
+		log.SetFormatter(new(log.JSONFormatter))
 	}
 }
