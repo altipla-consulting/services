@@ -51,7 +51,13 @@ func (service *Service) ConfigureSentry(dsn string) {
 }
 
 // ConfigureRouting enables a HTTP router.
-func (service *Service) ConfigureRouting(username, password string) {
+func (service *Service) ConfigureRouting() {
+	service.enableRouting = true
+}
+
+// ConfigureRouting enables a HTTP router with a simple password for to beta
+// test the real application.
+func (service *Service) ConfigureBetaRouting(username, password string) {
 	service.enableRouting = true
 	service.routingUsername = username
 	service.routingPassword = password
