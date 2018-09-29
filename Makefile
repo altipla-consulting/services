@@ -8,13 +8,7 @@ gofmt:
 deps:
 	go get -u github.com/mgechev/revive
 
-	go get -u cloud.google.com/go/profiler
-	go get -u github.com/altipla-consulting/cron
-	go get -u github.com/altipla-consulting/king
-	go get -u github.com/julienschmidt/httprouter
-	go get -u github.com/sirupsen/logrus
-	go get -u golang.org/x/net/trace
-
 test:
-	revive -formatter friendly
-	go install .
+	revive -formatter friendly v2
+	cd v2 && go install .
+	cd v2 && go test .

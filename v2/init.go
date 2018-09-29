@@ -8,29 +8,24 @@ import (
 	"time"
 
 	"cloud.google.com/go/profiler"
-	"github.com/altipla-consulting/cron"
-	"github.com/altipla-consulting/king"
-	"github.com/julienschmidt/httprouter"
+	"github.com/altipla-consulting/routing"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 )
 
+// Service stores the configuration of the service we are configuring.
 type Service struct {
 	name string
 
 	enableSentry bool
 	sentryDSN    string
 
-	enableKing bool
-	kingRouter *httprouter.Router
-
-	enableCron bool
-	cronRunner *cron.Runner
-
-	enableRouting    bool
-	httpRouter       *httprouter.Router
-	httpRouterCalled bool
+	enableRouting       bool
+	routingServer       *routing.Server
+	routingServerCalled bool
+	routingUsername     string
+	routingPassword     string
 
 	enableProfiler bool
 
@@ -39,14 +34,15 @@ type Service struct {
 	grpcServerCalled bool
 }
 
+// Init the configuration of a new service for the current application with
+// the provided name.
 func Init(name string) *Service {
 	return &Service{
-		name:       name,
-		kingRouter: httprouter.New(),
-		httpRouter: httprouter.New(),
+		name: name,
 	}
 }
 
+// ConfigureSentry enables Sentry support in all the features that support it.
 func (service *Service) ConfigureSentry(dsn string) {
 	if dsn != "" {
 		service.enableSentry = true
@@ -54,30 +50,31 @@ func (service *Service) ConfigureSentry(dsn string) {
 	}
 }
 
-func (service *Service) ConfigureKing() {
-	service.enableKing = true
-}
-
-func (service *Service) ConfigureCron() {
-	service.enableCron = true
-}
-
-func (service *Service) ConfigureRouting() {
+// ConfigureRouting enables a HTTP router.
+func (service *Service) ConfigureRouting(username, password string) {
 	service.enableRouting = true
+	service.routingUsername = username
+	service.routingPassword = password
 }
 
+// ConfigureProfiler enables the Stackdriver Profiler agent.
 func (service *Service) ConfigureProfiler() {
 	service.enableProfiler = true
 }
 
+// ConfigureGRPC enables a GRPC server.
 func (service *Service) ConfigureGRPC() {
 	service.enableGRPC = true
-	service.grpcServer = grpc.NewServer()
 }
 
+// GRPCServer returns the server to register new GRPC services on it.
 func (service *Service) GRPCServer() *grpc.Server {
 	if !service.enableGRPC {
 		panic("grpc must be enabled to get a grpc server")
+	}
+
+	if service.grpcServer == nil {
+		service.grpcServer = grpc.NewServer()
 	}
 
 	service.grpcServerCalled = true
@@ -85,40 +82,26 @@ func (service *Service) GRPCServer() *grpc.Server {
 	return service.grpcServer
 }
 
-func (service *Service) HTTPRouter() *httprouter.Router {
+// RoutingServer returns the server to register new HTTP routes on it.
+func (service *Service) RoutingServer() *routing.Server {
 	if !service.enableRouting {
-		panic("routing must be enabled to get an http router")
+		panic("routing must be enabled to get a routing router")
 	}
 
-	service.httpRouterCalled = true
+	if service.routingServer == nil {
+		service.routingServer = routing.NewServer(routing.WithLogrus(), routing.WithSentry(service.sentryDSN), routing.WithBetaAuth(service.routingUsername, service.routingPassword))
+	}
 
-	return service.httpRouter
+	service.routingServerCalled = true
+
+	return service.routingServer
 }
 
-func (service *Service) KingRouter() *httprouter.Router {
-	if !service.enableKing {
-		panic("king must be enabled to get a king router")
-	}
-
-	return service.kingRouter
-}
-
-func (service *Service) CronRunner() *cron.Runner {
-	if !service.enableCron {
-		panic("crons must be enabled to get a cron runner")
-	}
-
-	if service.cronRunner == nil {
-		service.cronRunner = cron.NewRunner(cron.WithSentry(service.sentryDSN))
-	}
-
-	return service.cronRunner
-}
-
+// Run starts listening in every configure port needed to provide the configured features.
 func (service *Service) Run() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	if service.enableRouting && !service.httpRouterCalled {
+	if service.enableRouting && !service.routingServerCalled {
 		panic("do not configure routing without routes")
 	}
 	if service.enableGRPC && !service.grpcServerCalled {
@@ -136,32 +119,9 @@ func (service *Service) Run() {
 		}
 	}
 
-	if service.enableKing {
-		options := []king.ServerOption{
-			king.WithHttprouter(service.kingRouter),
-			king.WithLogrus(),
-			king.Debug(IsLocal()),
-		}
-		if !IsLocal() {
-			options = append(options, king.WithSentry(service.sentryDSN))
-		}
-		king.NewServer(options...)
-	}
-
-	if service.enableCron && IsLocal() {
-		service.kingRouter.GET(fmt.Sprintf("/crons/%s/:job", service.name), service.cronRunner.Handler())
-		service.httpRouter.GET(fmt.Sprintf("/crons/%s/:job", service.name), service.cronRunner.Handler())
-	}
-
-	if service.enableKing || service.enableCron {
+	if service.enableRouting {
 		go func() {
-			log.Fatal(http.ListenAndServe(":9000", service.kingRouter))
-		}()
-	}
-
-	if service.enableRouting || service.enableCron {
-		go func() {
-			log.Fatal(http.ListenAndServe(":8080", service.httpRouter))
+			log.Fatal(http.ListenAndServe(":8080", service.routingServer.Router()))
 		}()
 	}
 
