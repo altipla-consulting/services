@@ -55,7 +55,7 @@ func (service *Service) ConfigureRouting() {
 	service.enableRouting = true
 }
 
-// ConfigureRouting enables a HTTP router with a simple password for to beta
+// ConfigureBetaRouting enables a HTTP router with a simple password for to beta
 // test the real application.
 func (service *Service) ConfigureBetaRouting(username, password string) {
 	service.enableRouting = true
@@ -80,7 +80,7 @@ func (service *Service) GRPCServer() *grpc.Server {
 	}
 
 	if service.grpcServer == nil {
-		service.grpcServer = grpc.NewServer()
+		service.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(grpcErrorLogger(service.sentryDSN)))
 	}
 
 	service.grpcServerCalled = true
