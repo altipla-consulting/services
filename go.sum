@@ -8,6 +8,8 @@ github.com/altipla-consulting/king v0.9.0 h1:F5k+s1/kd7/P9KjyIan2MoUWtN8TgNYZJFU
 github.com/altipla-consulting/king v0.9.0/go.mod h1:zi1usrCIHZ9QE6c11ds5JmkqMRc06ljWZHmNRKnS4b0=
 github.com/altipla-consulting/sentry v0.2.1 h1:3mlId+KDH5mrA7NbwoHuUjbPy7jfXqEMq1lgJkwgGNI=
 github.com/altipla-consulting/sentry v0.2.1/go.mod h1:+jUWDhpRrbl9c0r8JuFEmzl54B4IQcY9cdADy4GEP5o=
+github.com/altipla-consulting/sentry v0.2.2 h1:1o6YQhPqaItEfM4XknoVGg7VGMB5qHgvCqfwRSgj7gA=
+github.com/altipla-consulting/sentry v0.2.2/go.mod h1:+jUWDhpRrbl9c0r8JuFEmzl54B4IQcY9cdADy4GEP5o=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/certifi/gocertifi v0.0.0-20180905225744-ee1a9a0726d2 h1:MmeatFT1pTPSVb4nkPmBFN/LRZ97vPjsFKsZrU3KKTs=
 github.com/certifi/gocertifi v0.0.0-20180905225744-ee1a9a0726d2/go.mod h1:GJKEexRPVJrBSOjoqN5VNOIKJ5Q3RViH6eu3puDRwx4=
