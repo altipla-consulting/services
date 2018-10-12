@@ -8,9 +8,12 @@ import (
 	"time"
 
 	"cloud.google.com/go/profiler"
+	"contrib.go.opencensus.io/exporter/stackdriver"
 	"github.com/altipla-consulting/routing"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/trace"
+	"go.opencensus.io/plugin/ocgrpc"
+	"go.opencensus.io/trace"
+	gotrace "golang.org/x/net/trace"
 	"google.golang.org/grpc"
 )
 
@@ -28,6 +31,9 @@ type Service struct {
 	routingPassword     string
 
 	enableProfiler bool
+
+	enableTracer        bool
+	tracerGoogleProject string
 
 	enableGRPC       bool
 	grpcServer       *grpc.Server
@@ -68,6 +74,14 @@ func (service *Service) ConfigureProfiler() {
 	service.enableProfiler = true
 }
 
+// ConfigureTracer enables the Stackdriver Trace agent.
+func (service *Service) ConfigureTracer(googleProject string) {
+	if googleProject != "" {
+		service.enableTracer = true
+		service.tracerGoogleProject = googleProject
+	}
+}
+
 // ConfigureGRPC enables a GRPC server.
 func (service *Service) ConfigureGRPC() {
 	service.enableGRPC = true
@@ -80,7 +94,11 @@ func (service *Service) GRPCServer() *grpc.Server {
 	}
 
 	if service.grpcServer == nil {
-		service.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(grpcErrorLogger(service.sentryDSN)))
+		if service.enableProfiler {
+			service.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(grpcErrorLogger(service.sentryDSN)), grpc.StatsHandler(new(ocgrpc.ServerHandler)))
+		} else {
+			service.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(grpcErrorLogger(service.sentryDSN)))
+		}
 	}
 
 	service.grpcServerCalled = true
@@ -125,6 +143,18 @@ func (service *Service) Run() {
 		}
 	}
 
+	if service.enableTracer && !IsLocal() {
+		exporter, err := stackdriver.NewExporter(stackdriver.Options{ProjectID: service.tracerGoogleProject})
+		if err != nil {
+			log.Fatal(err)
+		}
+		trace.RegisterExporter(exporter)
+
+		trace.ApplyConfig(trace.Config{
+			DefaultSampler: trace.AlwaysSample(),
+		})
+	}
+
 	if service.enableRouting {
 		go func() {
 			log.Fatal(http.ListenAndServe(":8080", service.routingServer.Router()))
@@ -142,7 +172,7 @@ func (service *Service) Run() {
 		}()
 	}
 
-	trace.AuthRequest = func(req *http.Request) (any, sensitive bool) { return true, true }
+	gotrace.AuthRequest = func(req *http.Request) (any, sensitive bool) { return true, true }
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "%s is ok\n", service.name) })
 
 	log.WithField("name", service.name).Println("Instance initialized successfully!")
