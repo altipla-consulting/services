@@ -150,7 +150,7 @@ func (service *Service) Run() {
 		trace.RegisterExporter(exporter)
 
 		trace.ApplyConfig(trace.Config{
-			DefaultSampler: trace.AlwaysSample(),
+			DefaultSampler: CustomSampler,
 		})
 	}
 
