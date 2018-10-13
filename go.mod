@@ -4,7 +4,7 @@ require (
 	cloud.google.com/go v0.28.0
 	github.com/altipla-consulting/cron v1.1.0
 	github.com/altipla-consulting/king v0.9.0
-	github.com/altipla-consulting/sentry v0.3.0 // indirect
+	github.com/altipla-consulting/sentry v0.3.1 // indirect
 	github.com/certifi/gocertifi v0.0.0-20180905225744-ee1a9a0726d2 // indirect
 	github.com/getsentry/raven-go v0.0.0-20180903072508-084a9de9eb03 // indirect
 	github.com/google/pprof v0.0.0-20180926163344-782e5fd74720 // indirect

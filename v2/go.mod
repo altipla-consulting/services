@@ -4,7 +4,7 @@ require (
 	cloud.google.com/go v0.28.0
 	contrib.go.opencensus.io/exporter/stackdriver v0.6.0
 	github.com/altipla-consulting/routing v1.0.2
-	github.com/altipla-consulting/sentry v0.3.0
+	github.com/altipla-consulting/sentry v0.3.1
 	github.com/aws/aws-sdk-go v1.15.53 // indirect
 	github.com/google/pprof v0.0.0-20180926163344-782e5fd74720 // indirect
 	github.com/googleapis/gax-go v2.0.0+incompatible // indirect
