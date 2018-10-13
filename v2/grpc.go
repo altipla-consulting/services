@@ -31,9 +31,8 @@ func Dial(target Endpoint, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 
 // CustomSampler controls the traces to avoid sending uninteresting ones.
 func CustomSampler(params trace.SamplingParameters) trace.SamplingDecision {
-	log.WithField("name", params.Name).Info("Trace decision")
 	// Do not trace requests to the profiler that happen in the background.
-	if strings.HasPrefix(params.Name, "Sent.google.devtools.cloudprofiler.") {
+	if strings.HasPrefix(params.Name, "google.devtools.cloudprofiler.") {
 		return trace.SamplingDecision{}
 	}
 
