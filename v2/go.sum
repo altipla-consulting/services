@@ -10,6 +10,8 @@ github.com/altipla-consulting/sentry v0.2.1 h1:3mlId+KDH5mrA7NbwoHuUjbPy7jfXqEMq
 github.com/altipla-consulting/sentry v0.2.1/go.mod h1:+jUWDhpRrbl9c0r8JuFEmzl54B4IQcY9cdADy4GEP5o=
 github.com/altipla-consulting/sentry v0.2.2 h1:1o6YQhPqaItEfM4XknoVGg7VGMB5qHgvCqfwRSgj7gA=
 github.com/altipla-consulting/sentry v0.2.2/go.mod h1:+jUWDhpRrbl9c0r8JuFEmzl54B4IQcY9cdADy4GEP5o=
+github.com/altipla-consulting/sentry v0.3.0 h1:56hsBn4lFqCppQGxE7Zky5YSbTYREzqztHWUfYxJQr8=
+github.com/altipla-consulting/sentry v0.3.0/go.mod h1:+jUWDhpRrbl9c0r8JuFEmzl54B4IQcY9cdADy4GEP5o=
 github.com/aws/aws-sdk-go v1.15.53 h1:cpLlUzUgjuAR6g45vPXaDIXjgCEM4/LQ2DJBXcf1ZZE=
 github.com/aws/aws-sdk-go v1.15.53/go.mod h1:mFuSZ37Z9YOHbQEwBWztmVzqXrEkub65tZoCYDt7FT0=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
