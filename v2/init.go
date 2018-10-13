@@ -94,7 +94,7 @@ func (service *Service) GRPCServer() *grpc.Server {
 	}
 
 	if service.grpcServer == nil {
-		if service.enableProfiler {
+		if service.enableTracer {
 			service.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(grpcErrorLogger(service.sentryDSN)), grpc.StatsHandler(new(ocgrpc.ServerHandler)))
 		} else {
 			service.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(grpcErrorLogger(service.sentryDSN)))
