@@ -136,7 +136,6 @@ func (service *Service) Run() {
 		cnf := profiler.Config{
 			Service:        service.name,
 			ServiceVersion: Version(),
-			DebugLogging:   IsLocal(),
 		}
 		if err := profiler.Start(cnf); err != nil {
 			log.Fatal(err)
