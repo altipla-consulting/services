@@ -39,7 +39,7 @@ func CustomSampler(params trace.SamplingParameters) trace.SamplingDecision {
 	return trace.SamplingDecision{Sample: true}
 }
 
-func grpcUnaryErrorLogger(serviceName, dsn string) grpc.UnaryServerInterceptor {
+func grpcUnaryErrorLogger(enableTracer bool, serviceName, dsn string) grpc.UnaryServerInterceptor {
 	var client *sentry.Client
 	if dsn != "" {
 		client = sentry.NewClient(dsn)
@@ -47,6 +47,11 @@ func grpcUnaryErrorLogger(serviceName, dsn string) grpc.UnaryServerInterceptor {
 
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		ctx = sentry.WithContextRPC(ctx, serviceName, info.FullMethod)
+
+		if enableTracer {
+			span := trace.FromContext(ctx)
+			span.AddAttributes(trace.StringAttribute("app", serviceName))
+		}
 
 		resp, err := handler(ctx, req)
 		if err != nil {

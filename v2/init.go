@@ -95,7 +95,7 @@ func (service *Service) GRPCServer() *grpc.Server {
 
 	if service.grpcServer == nil {
 		opts := []grpc.ServerOption{
-			grpc.UnaryInterceptor(grpcUnaryErrorLogger(service.name, service.sentryDSN)),
+			grpc.UnaryInterceptor(grpcUnaryErrorLogger(service.enableTracer, service.name, service.sentryDSN)),
 			grpc.StreamInterceptor(grpcStreamErrorLogger(service.name, service.sentryDSN)),
 		}
 		if service.enableTracer {
