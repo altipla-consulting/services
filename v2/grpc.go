@@ -39,7 +39,7 @@ func CustomSampler(params trace.SamplingParameters) trace.SamplingDecision {
 	return trace.SamplingDecision{Sample: true}
 }
 
-func grpcErrorLogger(serviceName, dsn string) grpc.UnaryServerInterceptor {
+func grpcUnaryErrorLogger(serviceName, dsn string) grpc.UnaryServerInterceptor {
 	var client *sentry.Client
 	if dsn != "" {
 		client = sentry.NewClient(dsn)
@@ -50,31 +50,68 @@ func grpcErrorLogger(serviceName, dsn string) grpc.UnaryServerInterceptor {
 
 		resp, err := handler(ctx, req)
 		if err != nil {
-			grpcerr, ok := status.FromError(err)
-			if ok {
-				// Always log the GRPC errors.
-				log.WithFields(log.Fields{
-					"code":    grpcerr.Code().String(),
-					"message": grpcerr.Message(),
-				}).Error("GRPC call failed")
-
-				// Do not notify those status codes.
-				switch grpcerr.Code() {
-				case codes.InvalidArgument, codes.NotFound, codes.AlreadyExists, codes.FailedPrecondition, codes.Aborted, codes.Unimplemented:
-					return resp, err
-				}
-			} else {
-				log.WithFields(log.Fields{
-					"error": err.Error(),
-					"stack": errors.ErrorStack(err),
-				}).Error("Unknown error in GRPC call")
-			}
-
-			if client != nil {
-				client.ReportInternal(ctx, err)
-			}
+			logError(ctx, client, err)
 		}
 
 		return resp, err
+	}
+}
+
+type wrappedStream struct {
+	grpc.ServerStream
+	serviceName, method string
+}
+
+func (stream *wrappedStream) Context() context.Context {
+	ctx := stream.ServerStream.Context()
+	ctx = sentry.WithContextRPC(ctx, stream.serviceName, stream.method)
+
+	return ctx
+}
+
+func grpcStreamErrorLogger(serviceName, dsn string) grpc.StreamServerInterceptor {
+	var client *sentry.Client
+	if dsn != "" {
+		client = sentry.NewClient(dsn)
+	}
+
+	return func(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		wrapped := &wrappedStream{
+			ServerStream: stream,
+			serviceName:  serviceName,
+			method:       info.FullMethod,
+		}
+		err := handler(srv, wrapped)
+		if err != nil {
+			logError(wrapped.Context(), client, err)
+		}
+
+		return err
+	}
+}
+
+func logError(ctx context.Context, client *sentry.Client, err error) {
+	grpcerr, ok := status.FromError(err)
+	if ok {
+		// Always log the GRPC errors.
+		log.WithFields(log.Fields{
+			"code":    grpcerr.Code().String(),
+			"message": grpcerr.Message(),
+		}).Error("GRPC call failed")
+
+		// Do not notify those status codes.
+		switch grpcerr.Code() {
+		case codes.InvalidArgument, codes.NotFound, codes.AlreadyExists, codes.FailedPrecondition, codes.Aborted, codes.Unimplemented:
+			return
+		}
+	} else {
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+			"stack": errors.ErrorStack(err),
+		}).Error("Unknown error in GRPC call")
+	}
+
+	if client != nil {
+		client.ReportInternal(ctx, err)
 	}
 }

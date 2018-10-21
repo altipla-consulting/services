@@ -94,11 +94,15 @@ func (service *Service) GRPCServer() *grpc.Server {
 	}
 
 	if service.grpcServer == nil {
-		if service.enableTracer {
-			service.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(grpcErrorLogger(service.name, service.sentryDSN)), grpc.StatsHandler(new(ocgrpc.ServerHandler)))
-		} else {
-			service.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(grpcErrorLogger(service.name, service.sentryDSN)))
+		opts := []grpc.ServerOption{
+			grpc.UnaryInterceptor(grpcUnaryErrorLogger(service.name, service.sentryDSN)),
+			grpc.StreamInterceptor(grpcStreamErrorLogger(service.name, service.sentryDSN)),
 		}
+		if service.enableTracer {
+			opts = append(opts, grpc.StatsHandler(new(ocgrpc.ServerHandler)))
+		}
+
+		service.grpcServer = grpc.NewServer(opts...)
 	}
 
 	service.grpcServerCalled = true
