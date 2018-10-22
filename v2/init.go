@@ -153,8 +153,9 @@ func (service *Service) Run() {
 		}
 		trace.RegisterExporter(exporter)
 
+		sampler := newCustomSampler()
 		trace.ApplyConfig(trace.Config{
-			DefaultSampler: CustomSampler,
+			DefaultSampler: sampler.Sampler(),
 		})
 	}
 

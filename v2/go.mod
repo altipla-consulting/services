@@ -11,6 +11,7 @@ require (
 	github.com/juju/errors v0.0.0-20180806074554-22422dad46e1
 	github.com/julienschmidt/httprouter v0.0.0-20180715161854-348b672cd90d
 	github.com/sirupsen/logrus v1.1.0
+	github.com/stretchr/testify v1.2.2
 	go.opencensus.io v0.17.0
 	golang.org/x/net v0.0.0-20180926154720-4dfa2610cdf3
 	google.golang.org/api v0.0.0-20180929000454-5da02d31af7d // indirect

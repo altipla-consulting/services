@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"strings"
 
 	"github.com/altipla-consulting/sentry"
 	"github.com/juju/errors"
@@ -27,16 +26,6 @@ type Endpoint string
 func Dial(target Endpoint, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	opts = append(opts, grpc.WithStatsHandler(new(ocgrpc.ClientHandler)))
 	return grpc.Dial(string(target), opts...)
-}
-
-// CustomSampler controls the traces to avoid sending uninteresting ones.
-func CustomSampler(params trace.SamplingParameters) trace.SamplingDecision {
-	// Do not trace requests to the profiler that happen in the background.
-	if strings.HasPrefix(params.Name, "google.devtools.cloudprofiler.") {
-		return trace.SamplingDecision{}
-	}
-
-	return trace.SamplingDecision{Sample: true}
 }
 
 func grpcUnaryErrorLogger(enableTracer bool, serviceName, dsn string) grpc.UnaryServerInterceptor {
