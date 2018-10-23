@@ -93,26 +93,33 @@ func (sampler *customSampler) Sampler() trace.Sampler {
 
 		counter.incr(1)
 
+		// We see an increase in the rate of traces, rate limit the endpoint.
 		total := counter.total()
 		if total > 20 {
 			if counter.lastQuota.IsZero() {
 				log.WithField("endpoint", params.Name).Info("Downgrade tracing to avoid sending too much data")
 			}
 			counter.lastQuota = time.Now()
-
-			if time.Now().Sub(counter.lastMeasurement) > 10*time.Minute {
-				counter.lastMeasurement = time.Now()
-				return trace.SamplingDecision{Sample: true}
-			}
-
-			return trace.SamplingDecision{Sample: false}
 		}
 
-		if !counter.lastQuota.IsZero() && time.Now().Sub(counter.lastQuota) > 48*time.Hour {
+		// Standard case, no rate limiting measures are taken.
+		if counter.lastQuota.IsZero() {
+			return trace.SamplingDecision{Sample: true}
+		}
+
+		// If 48h make the endpoint quiet again we start tracing everything
+		// aggresively again.
+		if time.Now().Sub(counter.lastQuota) > 48*time.Hour {
 			log.WithField("endpoint", params.Name).Info("Upgrade tracing to always again")
 			counter.lastQuota = time.Time{}
+			return trace.SamplingDecision{Sample: true}
 		}
 
-		return trace.SamplingDecision{Sample: true}
+		// We take 1 trace every 10 minutes.
+		if time.Now().Sub(counter.lastMeasurement) > 10*time.Minute {
+			counter.lastMeasurement = time.Now()
+			return trace.SamplingDecision{Sample: true}
+		}
+		return trace.SamplingDecision{Sample: false}
 	}
 }
