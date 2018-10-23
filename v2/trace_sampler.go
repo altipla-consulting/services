@@ -82,6 +82,11 @@ func (sampler *customSampler) Sampler() trace.Sampler {
 			return trace.SamplingDecision{}
 		}
 
+		// If a parent decides to log we send all the tracing through the services.
+		if params.ParentContext.IsSampled() {
+			return trace.SamplingDecision{Sample: true}
+		}
+
 		sampler.mu.Lock()
 		defer sampler.mu.Unlock()
 
@@ -120,6 +125,6 @@ func (sampler *customSampler) Sampler() trace.Sampler {
 			counter.lastMeasurement = time.Now()
 			return trace.SamplingDecision{Sample: true}
 		}
-		return trace.SamplingDecision{Sample: false}
+		return trace.SamplingDecision{}
 	}
 }
