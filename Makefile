@@ -8,7 +8,7 @@ gofmt:
 deps:
 	go get -u github.com/mgechev/revive
 
-test:
+test: gofmt
 	revive -formatter friendly v2
 	cd v2 && go install .
 	cd v2 && go test .

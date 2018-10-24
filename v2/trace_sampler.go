@@ -1,6 +1,7 @@
 package services
 
 import (
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -16,7 +17,7 @@ type windowCounter struct {
 	timeProvider func() time.Time
 
 	lastQuota       time.Time
-	lastMeasurement time.Time
+	nextMeasurement time.Time
 }
 
 func newWindowCounter() *windowCounter {
@@ -112,17 +113,16 @@ func (sampler *customSampler) Sampler() trace.Sampler {
 			return trace.SamplingDecision{Sample: true}
 		}
 
-		// If 48h make the endpoint quiet again we start tracing everything
-		// aggresively again.
+		// If 48h make the endpoint quiet again we start tracing everything aggresively again.
 		if time.Now().Sub(counter.lastQuota) > 48*time.Hour {
 			log.WithField("endpoint", params.Name).Info("Upgrade tracing to always again")
 			counter.lastQuota = time.Time{}
 			return trace.SamplingDecision{Sample: true}
 		}
 
-		// We take 1 trace every 10 minutes.
-		if time.Now().Sub(counter.lastMeasurement) > 10*time.Minute {
-			counter.lastMeasurement = time.Now()
+		// We take 1 trace every 5-15 minutes randomly.
+		if time.Now().After(counter.nextMeasurement) {
+			counter.nextMeasurement = time.Now().Add(5*time.Minute + time.Duration(rand.Intn(10*60))*time.Second)
 			return trace.SamplingDecision{Sample: true}
 		}
 		return trace.SamplingDecision{}
