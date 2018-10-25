@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	_ "net/http/pprof"
+
 	"cloud.google.com/go/profiler"
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"github.com/altipla-consulting/routing"
