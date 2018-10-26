@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	// Register pprof
 	_ "net/http/pprof"
 
 	"cloud.google.com/go/profiler"

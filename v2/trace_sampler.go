@@ -88,6 +88,12 @@ func (sampler *customSampler) Sampler() trace.Sampler {
 			return trace.SamplingDecision{Sample: true}
 		}
 
+		// We have a parent that decided not to log; we don't log either.
+		empty := trace.SpanContext{}
+		if params.ParentContext != empty {
+			return trace.SamplingDecision{}
+		}
+
 		sampler.mu.Lock()
 		defer sampler.mu.Unlock()
 
