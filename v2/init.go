@@ -1,10 +1,15 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	// Register pprof
@@ -32,15 +37,19 @@ type Service struct {
 	routingServerCalled bool
 	routingUsername     string
 	routingPassword     string
+	routingHTTPServer   *http.Server
 
 	enableProfiler bool
 
 	enableTracer        bool
 	tracerGoogleProject string
+	traceExporter       *stackdriver.Exporter
 
 	enableGRPC       bool
 	grpcServer       *grpc.Server
 	grpcServerCalled bool
+
+	debugHTTPServer *http.Server
 }
 
 // Init the configuration of a new service for the current application with
@@ -74,12 +83,12 @@ func (service *Service) ConfigureBetaRouting(username, password string) {
 
 // ConfigureProfiler enables the Stackdriver Profiler agent.
 func (service *Service) ConfigureProfiler() {
-	service.enableProfiler = true
+	service.enableProfiler = !IsLocal()
 }
 
 // ConfigureTracer enables the Stackdriver Trace agent.
 func (service *Service) ConfigureTracer(googleProject string) {
-	if googleProject != "" {
+	if googleProject != "" && !IsLocal() {
 		service.enableTracer = true
 		service.tracerGoogleProject = googleProject
 	}
@@ -139,7 +148,7 @@ func (service *Service) Run() {
 		panic("do not configure grpc without services")
 	}
 
-	if service.enableProfiler && !IsLocal() {
+	if service.enableProfiler {
 		cnf := profiler.Config{
 			Service:        service.name,
 			ServiceVersion: Version(),
@@ -149,12 +158,13 @@ func (service *Service) Run() {
 		}
 	}
 
-	if service.enableTracer && !IsLocal() {
-		exporter, err := stackdriver.NewExporter(stackdriver.Options{ProjectID: service.tracerGoogleProject})
+	if service.enableTracer {
+		var err error
+		service.traceExporter, err = stackdriver.NewExporter(stackdriver.Options{ProjectID: service.tracerGoogleProject})
 		if err != nil {
 			log.Fatal(err)
 		}
-		trace.RegisterExporter(exporter)
+		trace.RegisterExporter(service.traceExporter)
 
 		sampler := newCustomSampler()
 		trace.ApplyConfig(trace.Config{
@@ -164,24 +174,98 @@ func (service *Service) Run() {
 
 	if service.enableRouting {
 		go func() {
-			log.Fatal(http.ListenAndServe(":8080", service.routingServer.Router()))
+			service.routingHTTPServer = &http.Server{
+				Addr:    ":8080",
+				Handler: service.routingServer.Router(),
+			}
+			if err := service.routingHTTPServer.ListenAndServe(); err != nil {
+				log.Fatal(err)
+			}
 		}()
 	}
 
 	if service.enableGRPC {
 		go func() {
-			lis, err := net.Listen("tcp", ":9000")
+			listener, err := net.Listen("tcp", ":9000")
 			if err != nil {
 				log.Fatal(err)
 			}
 			log.Info("GRPC server initialized successfully!")
-			log.Fatal(service.grpcServer.Serve(lis))
+			log.Fatal(service.grpcServer.Serve(listener))
 		}()
 	}
 
 	gotrace.AuthRequest = func(req *http.Request) (any, sensitive bool) { return true, true }
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "%s is ok\n", service.name) })
 
+	service.stopListener()
+
 	log.WithField("name", service.name).Println("Instance initialized successfully!")
-	log.Fatal(http.ListenAndServe(":8000", nil))
+
+	service.debugHTTPServer = &http.Server{
+		Addr: ":8000",
+	}
+	if err := service.debugHTTPServer.ListenAndServe(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (service *Service) stopListener() {
+	var gracefulStop = make(chan os.Signal)
+	signal.Notify(gracefulStop, syscall.SIGTERM)
+	signal.Notify(gracefulStop, syscall.SIGINT)
+
+	go func() {
+		sig := <-gracefulStop
+		log.WithField("signal", sig).Info("Caught OS signal")
+
+		var wg sync.WaitGroup
+
+		if service.enableGRPC {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				service.grpcServer.GracefulStop()
+			}()
+		}
+
+		if service.enableTracer {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				service.traceExporter.Flush()
+			}()
+		}
+
+		if service.enableRouting {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+				defer cancel()
+
+				if err := service.routingHTTPServer.Shutdown(ctx); err != nil {
+					log.WithField("error", err).Error("Cannot shutdown routing HTTP server")
+				}
+			}()
+		}
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+
+			if err := service.debugHTTPServer.Shutdown(ctx); err != nil {
+				log.WithField("error", err).Error("Cannot shutdown debug HTTP server")
+			}
+		}()
+
+		wg.Wait()
+		os.Exit(0)
+	}()
 }
