@@ -148,7 +148,13 @@ func (service *Service) Run() {
 		panic("do not configure grpc without services")
 	}
 
+	if service.enableSentry {
+		log.WithField("dsn", service.sentryDSN).Info("Sentry enabled")
+	}
+
 	if service.enableProfiler {
+		log.Info("Stackdriver Profiler enabled")
+
 		cnf := profiler.Config{
 			Service:        service.name,
 			ServiceVersion: Version(),
@@ -159,6 +165,8 @@ func (service *Service) Run() {
 	}
 
 	if service.enableTracer {
+		log.WithField("project", service.tracerGoogleProject).Info("Stackdriver Trace enabled")
+
 		var err error
 		service.traceExporter, err = stackdriver.NewExporter(stackdriver.Options{ProjectID: service.tracerGoogleProject})
 		if err != nil {
@@ -174,6 +182,15 @@ func (service *Service) Run() {
 
 	if service.enableRouting {
 		go func() {
+			if service.routingUsername != "" {
+				log.WithFields(log.Fields{
+					"username": service.routingUsername,
+					"password": service.routingPassword,
+				}).Info("Routing beta server enabled")
+			} else {
+				log.Info("Routing server enabled")
+			}
+
 			service.routingHTTPServer = &http.Server{
 				Addr:    ":8080",
 				Handler: service.routingServer.Router(),
@@ -186,11 +203,12 @@ func (service *Service) Run() {
 
 	if service.enableGRPC {
 		go func() {
+			log.Info("GRPC server enabled")
+
 			listener, err := net.Listen("tcp", ":9000")
 			if err != nil {
 				log.Fatal(err)
 			}
-			log.Info("GRPC server initialized successfully!")
 			log.Fatal(service.grpcServer.Serve(listener))
 		}()
 	}
