@@ -12,3 +12,8 @@ test: gofmt
 	revive -formatter friendly v2
 	cd v2 && go install .
 	cd v2 && go test .
+
+update-deps:
+	go get -u
+	go mod download
+	go mod tidy
