@@ -35,9 +35,8 @@ type Service struct {
 	enableRouting       bool
 	routingServer       *routing.Server
 	routingServerCalled bool
-	routingUsername     string
-	routingPassword     string
 	routingHTTPServer   *http.Server
+	routingOpts         []routing.ServerOption
 
 	enableProfiler bool
 
@@ -68,17 +67,20 @@ func (service *Service) ConfigureSentry(dsn string) {
 	}
 }
 
-// ConfigureRouting enables a HTTP router.
-func (service *Service) ConfigureRouting() {
+// ConfigureRouting enables a HTTP router with the custom options we need. Logrus will
+// be always enabled and Sentry will be configured if a DSN is provided in the
+// ConfigureSentry call.
+func (service *Service) ConfigureRouting(opts ...routing.ServerOption) {
 	service.enableRouting = true
+	service.routingOpts = opts
 }
 
 // ConfigureBetaRouting enables a HTTP router with a simple password for to beta
 // test the real application.
+//
+// DEPRECATED: Use ConfigureRouting(routing.WithBetaAuth(username, password)) instead.
 func (service *Service) ConfigureBetaRouting(username, password string) {
-	service.enableRouting = true
-	service.routingUsername = username
-	service.routingPassword = password
+	service.ConfigureRouting(routing.WithBetaAuth(username, password))
 }
 
 // ConfigureProfiler enables the Stackdriver Profiler agent.
@@ -129,7 +131,12 @@ func (service *Service) RoutingServer() *routing.Server {
 	}
 
 	if service.routingServer == nil {
-		service.routingServer = routing.NewServer(routing.WithLogrus(), routing.WithSentry(service.sentryDSN), routing.WithBetaAuth(service.routingUsername, service.routingPassword))
+		opts := []routing.ServerOption{
+			routing.WithLogrus(),
+			routing.WithSentry(service.sentryDSN),
+		}
+		opts = append(opts, service.routingOpts...)
+		service.routingServer = routing.NewServer(opts...)
 	}
 
 	service.routingServerCalled = true
@@ -182,14 +189,7 @@ func (service *Service) Run() {
 
 	if service.enableRouting {
 		go func() {
-			if service.routingUsername != "" {
-				log.WithFields(log.Fields{
-					"username": service.routingUsername,
-					"password": service.routingPassword,
-				}).Info("Routing beta server enabled")
-			} else {
-				log.Info("Routing server enabled")
-			}
+			log.Info("Routing server enabled")
 
 			service.routingHTTPServer = &http.Server{
 				Addr:    ":8080",
