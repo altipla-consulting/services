@@ -195,7 +195,7 @@ func (service *Service) Run() {
 				Addr:    ":8080",
 				Handler: service.routingServer.Router(),
 			}
-			if err := service.routingHTTPServer.ListenAndServe(); err != nil {
+			if err := service.routingHTTPServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Fatal(err)
 			}
 		}()
@@ -223,7 +223,7 @@ func (service *Service) Run() {
 	service.debugHTTPServer = &http.Server{
 		Addr: ":8000",
 	}
-	if err := service.debugHTTPServer.ListenAndServe(); err != nil {
+	if err := service.debugHTTPServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 }
